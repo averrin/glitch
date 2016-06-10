@@ -49,7 +49,24 @@ func (app *Application) run() int {
 		for {
 			r := *app.Scene.Layers["root"].Items[0]
 			rect := r.GetRect()
-			r.SetRect(&sdl.Rect{rect.X, rect.Y + d, rect.W, rect.H})
+			r.Move(0, d)
+			sdl.Delay(50)
+			if rect.Y == 100 {
+				d = -2
+			}
+			if rect.Y == 0 {
+				d = 2
+			}
+		}
+	}()
+
+	go func() {
+		var d int32
+		d = 2
+		for {
+			r := *app.Scene.Layers["test"].Items[0]
+			rect := r.GetRect()
+			r.Move(d, d)
 			sdl.Delay(50)
 			if rect.Y == 100 {
 				d = -2
@@ -79,23 +96,19 @@ func (app *Application) run() int {
 				}
 				if key == "Down" {
 					r := *app.Scene.Layers["root"].Items[0]
-					rect := r.GetRect()
-					r.SetRect(&sdl.Rect{rect.X, rect.Y + 1, rect.W, rect.H})
+					r.Move(0, 2)
 				}
 				if key == "Up" {
 					r := *app.Scene.Layers["root"].Items[0]
-					rect := r.GetRect()
-					r.SetRect(&sdl.Rect{rect.X, rect.Y - 1, rect.W, rect.H})
+					r.Move(0, -2)
 				}
 				if key == "Left" {
 					r := *app.Scene.Layers["root"].Items[0]
-					rect := r.GetRect()
-					r.SetRect(&sdl.Rect{rect.X - 1, rect.Y, rect.W, rect.H})
+					r.Move(-2, 0)
 				}
 				if key == "Right" {
 					r := *app.Scene.Layers["root"].Items[0]
-					rect := r.GetRect()
-					r.SetRect(&sdl.Rect{rect.X + 1, rect.Y, rect.W, rect.H})
+					r.Move(2, 0)
 				}
 			default:
 				// ret = app.Modes[app.Mode].DispatchEvents(event)

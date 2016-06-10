@@ -4,10 +4,11 @@ import "github.com/veandco/go-sdl2/sdl"
 
 type Drawable interface {
 	Draw(*sdl.Surface)
-	SetRect(*sdl.Rect)
-	GetRect() *sdl.Rect
+	Move(int32, int32)
+	MoveTo(int32, int32)
 	IsChanged() bool
-	GetLastRect() *sdl.Rect
+	Clear(*sdl.Surface)
+	GetRect() *sdl.Rect
 }
 
 type Rect struct {
@@ -48,6 +49,24 @@ func (item *Rect) SetRect(rect *sdl.Rect) {
 
 func (item *Rect) IsChanged() bool {
 	return item.Changed
+}
+
+func (item *Rect) Clear(s *sdl.Surface) {
+	s.FillRect(item.LastRect, 0x00000000)
+}
+
+func (item *Rect) Move(x int32, y int32) {
+	item.LastRect = &sdl.Rect{item.Rect.X, item.Rect.Y, item.Rect.W, item.Rect.H}
+	item.Rect.X += x
+	item.Rect.Y += y
+	item.Changed = true
+}
+
+func (item *Rect) MoveTo(x int32, y int32) {
+	item.LastRect = &sdl.Rect{item.Rect.X, item.Rect.Y, item.Rect.W, item.Rect.H}
+	item.Rect.X = x
+	item.Rect.Y = y
+	item.Changed = true
 }
 
 type Text struct {

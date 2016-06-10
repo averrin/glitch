@@ -40,6 +40,7 @@ func (S *Scene) Run() {
 	for {
 		S.Draw()
 		S.App.Window.UpdateSurface()
+		sdl.Delay(10)
 	}
 }
 
