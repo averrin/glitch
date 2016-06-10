@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"log"
 	"os"
 
 	"github.com/veandco/go-sdl2/sdl"
@@ -42,6 +41,24 @@ func (app *Application) run() int {
 	renderer.Present()
 	sdl.Delay(5)
 	app.Window.UpdateSurface()
+	go app.Scene.Run()
+
+	go func() {
+		var d int32
+		d = 2
+		for {
+			r := *app.Scene.Layers["root"].Items[0]
+			rect := r.GetRect()
+			r.SetRect(&sdl.Rect{rect.X, rect.Y + d, rect.W, rect.H})
+			sdl.Delay(50)
+			if rect.Y == 100 {
+				d = -2
+			}
+			if rect.Y == 0 {
+				d = 2
+			}
+		}
+	}()
 
 	running := true
 	for running {
@@ -55,7 +72,7 @@ func (app *Application) run() int {
 				// fmt.Printf("[%d ms] Keyboard\ttype:%d\tsym:%s\tmodifiers:%d\tstate:%d\trepeat:%d\n",
 				// t.Timestamp, t.Type, sdl.GetScancodeName(t.Keysym.Scancode), t.Keysym.Mod, t.State, t.Repeat)
 				key := sdl.GetScancodeName(t.Keysym.Scancode)
-				log.Println(key)
+				// log.Println(key)
 				//TODO: make mode switching more robust
 				if t.Keysym.Sym == sdl.K_ESCAPE || t.Keysym.Sym == sdl.K_CAPSLOCK {
 					ret = 0
@@ -64,8 +81,21 @@ func (app *Application) run() int {
 					r := *app.Scene.Layers["root"].Items[0]
 					rect := r.GetRect()
 					r.SetRect(&sdl.Rect{rect.X, rect.Y + 1, rect.W, rect.H})
-					app.Scene.Draw()
-					app.Window.UpdateSurface()
+				}
+				if key == "Up" {
+					r := *app.Scene.Layers["root"].Items[0]
+					rect := r.GetRect()
+					r.SetRect(&sdl.Rect{rect.X, rect.Y - 1, rect.W, rect.H})
+				}
+				if key == "Left" {
+					r := *app.Scene.Layers["root"].Items[0]
+					rect := r.GetRect()
+					r.SetRect(&sdl.Rect{rect.X - 1, rect.Y, rect.W, rect.H})
+				}
+				if key == "Right" {
+					r := *app.Scene.Layers["root"].Items[0]
+					rect := r.GetRect()
+					r.SetRect(&sdl.Rect{rect.X + 1, rect.Y, rect.W, rect.H})
 				}
 			default:
 				// ret = app.Modes[app.Mode].DispatchEvents(event)

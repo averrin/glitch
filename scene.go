@@ -26,14 +26,21 @@ func NewScene(app *Application, size Geometry) *Scene {
 	scene.Geometry = size
 	scene.Rect = sdl.Rect{0, 0, size.Width, size.Height}
 	scene.Layers = map[string]*Layer{}
-	scene.AddLayer("root")
 	scene.AddLayer("test")
-	r := Rect{&sdl.Rect{0, 0, 100, 100}, 0xffff0000}
-	g := Rect{&sdl.Rect{50, 50, 100, 100}, 0xff00ff00}
+	scene.AddLayer("root")
+	r := NewRect(&sdl.Rect{0, 0, 100, 100}, 0xffff0000)
+	g := NewRect(&sdl.Rect{50, 50, 100, 100}, 0xff00ff00)
 	scene.Layers["root"].AddItem(&r)
 	scene.Layers["test"].AddItem(&g)
 	scene.Draw()
 	return scene
+}
+
+func (S *Scene) Run() {
+	for {
+		S.Draw()
+		S.App.Window.UpdateSurface()
+	}
 }
 
 func (S *Scene) Draw() {

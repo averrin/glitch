@@ -16,8 +16,11 @@ func (L *Layer) AddItem(item Drawable) {
 
 func (L *Layer) Draw(s *sdl.Surface) {
 	for _, item := range L.Items {
-		(*item).Draw(L.Surface)
+		i := (*item)
+		if i.IsChanged() {
+			L.Surface.FillRect(i.GetLastRect(), 0x00000000)
+			i.Draw(L.Surface)
+		}
 	}
 	L.Surface.Blit(&L.Rect, s, &L.Rect)
-	L.Surface.FillRect(&L.Rect, 0x00000000)
 }
