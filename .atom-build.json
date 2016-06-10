@@ -1,0 +1,16 @@
+{
+  "keymap": "alt-v",
+  "cwd": "{PROJECT_PATH}",
+  "cmd": "/usr/local/go/bin/go",
+  "name": "glitch",
+  "args": ["build", "-ldflags \"-s\"", "-o", "./glitch", "./*.go"],
+  "sh": true,
+  "atomCommandName": "Glitch:build",
+  "env": {
+    "GOROOT": "/usr/local/go",
+    "GOPATH": "/home/user/projects/go:/home/user/projects/glitch"
+  },
+  "errorMatch": [
+    "(?<file>[\/0-9a-zA-Z\\._]+):(?<line>\\d+): (?<message>.+)"
+  ]
+}
