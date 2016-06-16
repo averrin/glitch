@@ -24,3 +24,15 @@ func (L *Layer) Draw(s *sdl.Surface) {
 	}
 	L.Surface.Blit(&L.Rect, s, &L.Rect)
 }
+
+func (L *Layer) GetChanged() bool {
+	changed := false
+	for _, item := range L.Items {
+		i := (*item)
+		ch := i.IsChanged()
+		if !changed && ch {
+			return true
+		}
+	}
+	return changed
+}

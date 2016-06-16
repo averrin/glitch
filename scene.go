@@ -2,8 +2,13 @@ package main
 
 import (
 	"errors"
+	"os"
+	"path"
+	"path/filepath"
+	"sync"
 
 	"github.com/veandco/go-sdl2/sdl"
+	"github.com/veandco/go-sdl2/sdl_ttf"
 )
 
 type Geometry struct {
@@ -12,12 +17,16 @@ type Geometry struct {
 }
 
 type Scene struct {
+	sync.Mutex
 	App         *Application
 	Rect        sdl.Rect
 	LayersStack []*Layer
 	Layers      map[string]*Layer
 	Geometry
 }
+
+var font *ttf.Font
+var boldFont *ttf.Font
 
 //NewScene constructor
 func NewScene(app *Application, size Geometry) *Scene {
@@ -26,40 +35,72 @@ func NewScene(app *Application, size Geometry) *Scene {
 	scene.Geometry = size
 	scene.Rect = sdl.Rect{0, 0, size.Width, size.Height}
 	scene.Layers = map[string]*Layer{}
-	scene.AddLayer("test")
+
+	cwd, _ := filepath.Abs(filepath.Dir(os.Args[0]))
+	dir := filepath.Join(cwd, "fonts")
+	font, _ = ttf.OpenFont(path.Join(dir, "Fantasque Regular.ttf"), 16)
+	boldFont, _ = ttf.OpenFont(path.Join(dir, "Fantasque Bold.ttf"), 16)
+
 	scene.AddLayer("root")
-	r := NewRect(&sdl.Rect{0, 0, 100, 100}, 0xffff0000)
-	g := NewRect(&sdl.Rect{50, 50, 100, 100}, 0xff00ff00)
-	scene.Layers["root"].AddItem(&r)
-	scene.Layers["test"].AddItem(&g)
 	scene.Draw()
 	return scene
 }
 
 func (S *Scene) Run() {
 	for {
-		S.Draw()
-		S.App.Window.UpdateSurface()
+		changed := S.Draw()
+		if changed {
+			S.App.Window.UpdateSurface()
+		}
 		sdl.Delay(10)
 	}
 }
 
-func (S *Scene) Draw() {
+func (S *Scene) UpLayer(layerName string) {
+	layer := S.Layers[layerName]
+	var n int
+	var l *Layer
+	for n, l = range S.LayersStack {
+		if l == layer {
+			break
+		}
+	}
+	S.LayersStack = append(S.LayersStack[:n], S.LayersStack[n+1:]...)
+	S.LayersStack = append(S.LayersStack, layer)
+}
+
+func (S *Scene) Draw() bool {
+	changed := S.GetChanged()
+	if !changed {
+		return changed
+	}
 	S.Clear()
 	for _, layer := range S.LayersStack {
 		layer.Draw(S.App.Surface)
 	}
+	return changed
+}
+
+func (S *Scene) GetChanged() bool {
+	changed := false
+	for _, l := range S.LayersStack {
+		ch := l.GetChanged()
+		if !changed && ch {
+			return true
+		}
+	}
+	return changed
 }
 
 func (S *Scene) Clear() {
 	S.App.Surface.FillRect(&S.Rect, 0xff242424)
 }
 
-func (S *Scene) AddLayer(name string) error {
+func (S *Scene) AddLayer(name string) (*Layer, error) {
 	var layer *Layer
 	layer, ok := S.Layers[name]
 	if ok {
-		return errors.New("Use another layer name")
+		return nil, errors.New("Use another layer name")
 	}
 	layer = new(Layer)
 	S.Layers[name] = layer
@@ -71,5 +112,5 @@ func (S *Scene) AddLayer(name string) error {
 	bmask := uint32(0x000000ff)
 	layer.Surface, _ = sdl.CreateRGBSurface(sdl.SWSURFACE, S.Width, S.Height, 32, rmask, gmask, bmask, amask)
 	S.LayersStack = append(S.LayersStack, layer)
-	return nil
+	return layer, nil
 }
