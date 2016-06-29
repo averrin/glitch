@@ -117,7 +117,7 @@ func (app *Application) run() int {
 
 func main() {
 	if _, err := os.Stat("cache"); err != nil {
-		os.Mkdir("cache", 777)
+		os.Mkdir("cache", 0777)
 	}
 	STEAMID = flag.String("steamID", "76561198049930669", "Steam user ID")
 	flag.Parse()
