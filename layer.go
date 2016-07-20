@@ -4,6 +4,7 @@ import "github.com/veandco/go-sdl2/sdl"
 
 type Layer struct {
 	Name string
+	Desc string
 	Geometry
 	Rect    sdl.Rect
 	Surface *sdl.Surface
@@ -18,6 +19,7 @@ func (L *Layer) Draw(s *sdl.Surface) {
 	for _, item := range L.Items {
 		i := (*item)
 		if i.IsChanged() {
+			L.Surface.FillRect(&L.Rect, 0x00000000)
 			i.Clear(L.Surface)
 			i.Draw(L.Surface)
 		}
@@ -35,4 +37,12 @@ func (L *Layer) GetChanged() bool {
 		}
 	}
 	return changed
+}
+
+func (L *Layer) Destroy() {
+	L.Surface.Free()
+	for _, item := range L.Items {
+		i := (*item)
+		i.Destroy()
+	}
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -22,6 +23,7 @@ type Scene struct {
 	Rect        sdl.Rect
 	LayersStack []*Layer
 	Layers      map[string]*Layer
+	Changed     bool
 	Geometry
 }
 
@@ -51,9 +53,15 @@ func (S *Scene) Run() {
 		changed := S.Draw()
 		if changed {
 			S.App.Window.UpdateSurface()
+			S.Changed = false
 		}
-		sdl.Delay(10)
+		sdl.Delay(5)
 	}
+}
+
+func (S *Scene) Reset() {
+	S.Layers = map[string]*Layer{}
+	S.LayersStack = []*Layer{}
 }
 
 func (S *Scene) UpLayer(layerName string) {
@@ -70,19 +78,23 @@ func (S *Scene) UpLayer(layerName string) {
 }
 
 func (S *Scene) Draw() bool {
+	S.Lock()
 	changed := S.GetChanged()
 	if !changed {
+		S.Unlock()
 		return changed
 	}
+	fmt.Println("scene changed")
 	S.Clear()
 	for _, layer := range S.LayersStack {
 		layer.Draw(S.App.Surface)
 	}
+	S.Unlock()
 	return changed
 }
 
 func (S *Scene) GetChanged() bool {
-	changed := false
+	changed := S.Changed
 	for _, l := range S.LayersStack {
 		ch := l.GetChanged()
 		if !changed && ch {
@@ -96,11 +108,30 @@ func (S *Scene) Clear() {
 	S.App.Surface.FillRect(&S.Rect, 0xff242424)
 }
 
+func (S *Scene) removeLayer(name string) {
+	S.Lock()
+	_, ok := S.Layers[name]
+	if !ok {
+		S.Unlock()
+		return
+	}
+	delete(S.Layers, name)
+	for i, l := range S.LayersStack {
+		if l.Name == name {
+			l.Destroy()
+			S.LayersStack = append(S.LayersStack[:i], S.LayersStack[i+1:]...)
+			break
+		}
+	}
+	S.Changed = true
+	S.Unlock()
+}
+
 func (S *Scene) AddLayer(name string) (*Layer, error) {
 	var layer *Layer
 	layer, ok := S.Layers[name]
 	if ok {
-		return nil, errors.New("Use another layer name")
+		return layer, errors.New("Use another layer name")
 	}
 	layer = new(Layer)
 	S.Layers[name] = layer
@@ -111,6 +142,8 @@ func (S *Scene) AddLayer(name string) (*Layer, error) {
 	gmask := uint32(0x0000ff00)
 	bmask := uint32(0x000000ff)
 	layer.Surface, _ = sdl.CreateRGBSurface(sdl.SWSURFACE, S.Width, S.Height, 32, rmask, gmask, bmask, amask)
+	layer.Surface.FillRect(&layer.Rect, 0x00000000)
 	S.LayersStack = append(S.LayersStack, layer)
+	S.Changed = true
 	return layer, nil
 }

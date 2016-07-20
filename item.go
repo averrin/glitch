@@ -16,6 +16,7 @@ type Drawable interface {
 	SetScale(float64)
 	GetScale() float64
 	GetRect() *sdl.Rect
+	Destroy()
 }
 
 type Rect struct {
@@ -76,6 +77,7 @@ func NewRect(rect *sdl.Rect, color uint32) Rect {
 
 func (item *Image) Draw(s *sdl.Surface) {
 	r := item.GetRect()
+	log.Println(r.X/r.W, r.Y/r.H)
 	item.Image.BlitScaled(
 		&sdl.Rect{0, 0, item.Image.W, item.Image.H},
 		s,
@@ -83,6 +85,13 @@ func (item *Image) Draw(s *sdl.Surface) {
 	)
 	item.Changed = false
 	item.LastRect = item.GetRect()
+}
+
+func (item *Image) Destroy() {
+	item.Image.Free()
+}
+
+func (item *Rect) Destroy() {
 }
 
 func (item *Rect) Draw(s *sdl.Surface) {
@@ -152,7 +161,6 @@ func NewText(rect *sdl.Rect, text string, color uint32) Text {
 }
 
 func (item *Text) Draw(s *sdl.Surface) {
-	log.Print(item.Text, font)
 	message, err := font.RenderUTF8_Blended(item.Text, sdl.Color{250, 250, 250, 1})
 	if err != nil {
 		log.Fatal(err)
