@@ -149,9 +149,6 @@ func drawItem(app *Application, game Game, c int, r int) {
 }
 
 func redraw(app *Application, rows int, cols int, d int) {
-	fmt.Println("----")
-	// r := offset
-	// c := 0
 	gw := games[offset*cols : (rows+offset+1)*cols]
 	gwIDs := func() []string {
 		r := []string{}
@@ -172,8 +169,8 @@ func redraw(app *Application, rows int, cols int, d int) {
 			if l.Name == n {
 				item := *l.Items[0]
 				item.Move(0, int32(-th*d))
-				rect := item.GetRect()
-				fmt.Println("m", l.Desc, rect.X/rect.W, rect.Y/rect.H)
+				// rect := item.GetRect()
+				// fmt.Println("m", l.Desc, rect.X/rect.W, rect.Y/rect.H)
 				b = true
 				counter++
 				break
@@ -182,7 +179,7 @@ func redraw(app *Application, rows int, cols int, d int) {
 		if b {
 			continue
 		}
-		fmt.Println("r", l.Desc)
+		// fmt.Println("r", l.Desc)
 		app.Scene.removeLayer(l.Name)
 	}
 	c := 0
@@ -195,11 +192,10 @@ func redraw(app *Application, rows int, cols int, d int) {
 	for i, g := range gs {
 		c = i % cols
 		go func(row int, col int, game Game) {
-			fmt.Println("d", game.Name, c, r)
+			// fmt.Println("d", game.Name, c, r)
 			drawItem(app, game, col, row)
 		}(r, c, g)
 	}
-	log.Print(">>>>", counter)
 }
 
 func main() {

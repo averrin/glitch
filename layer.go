@@ -19,7 +19,7 @@ func (L *Layer) Draw(s *sdl.Surface) {
 	for _, item := range L.Items {
 		i := (*item)
 		if i.IsChanged() {
-			L.Surface.FillRect(&L.Rect, 0x00000000)
+			// L.Surface.FillRect(&L.Rect, 0x00000000)
 			i.Clear(L.Surface)
 			i.Draw(L.Surface)
 		}

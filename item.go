@@ -77,7 +77,7 @@ func NewRect(rect *sdl.Rect, color uint32) Rect {
 
 func (item *Image) Draw(s *sdl.Surface) {
 	r := item.GetRect()
-	log.Println(r.X/r.W, r.Y/r.H)
+	// log.Println(r.X/r.W, r.Y/r.H)
 	item.Image.BlitScaled(
 		&sdl.Rect{0, 0, item.Image.W, item.Image.H},
 		s,
@@ -120,8 +120,8 @@ func (item *Rect) IsChanged() bool {
 
 func (item *Rect) Clear(s *sdl.Surface) {
 	r := item.GetLastRect()
-	lr := sdl.Rect{r.X, r.Y, int32(float64(r.W) * item.LastScale), int32(float64(r.H) * item.LastScale)}
-	s.FillRect(&lr, 0x00000000)
+	// lr := sdl.Rect{r.X, r.Y, int32(float64(r.W) * item.LastScale), int32(float64(r.H) * item.LastScale)}
+	s.FillRect(r, 0x00000000)
 }
 
 func (item *Rect) SetScale(scale float64) {
