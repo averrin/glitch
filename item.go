@@ -2,36 +2,45 @@ package main
 
 import (
 	"log"
+	"math"
 	"strings"
+	"time"
 
 	"github.com/veandco/go-sdl2/sdl"
 )
 
 type Drawable interface {
-	Draw(*sdl.Surface)
+	Draw()
 	Move(int32, int32)
+	AnimateMove(int32, int32, int32)
 	MoveTo(int32, int32)
 	IsChanged() bool
-	Clear(*sdl.Surface)
+	Clear()
 	SetScale(float64)
 	GetScale() float64
 	GetRect() *sdl.Rect
+	SetParentSurface(*sdl.Surface)
 	Destroy()
 }
 
 type Rect struct {
-	Rect      *sdl.Rect
-	LastRect  *sdl.Rect
-	Color     uint32
-	Scale     float64
-	LastScale float64
-	Changed   bool
+	ParentSurface *sdl.Surface
+	Rect          *sdl.Rect
+	LastRects     []*sdl.Rect
+	Color         uint32
+	Scale         float64
+	LastScale     float64
+	Changed       bool
 }
 
 type Image struct {
 	Rect
 	Path  string
 	Image *sdl.Surface
+}
+
+func (item *Rect) SetParentSurface(s *sdl.Surface) {
+	item.ParentSurface = s
 }
 
 func StripLine(line string, w int32) string {
@@ -60,7 +69,8 @@ func NewImage(rect *sdl.Rect, path string, alt string) Image {
 		alt = StripLine(alt, rect.W)
 		lw, _, _ := font.SizeUTF8(alt)
 		title := NewText(&sdl.Rect{int32(rect.W/2) - int32(lw/2), int32(rect.H/2) - int32(font.Height()/2), int32(lw), int32(font.Height())}, alt, 0xfff0f0f0)
-		title.Draw(item.Image)
+		title.SetParentSurface(item.Image)
+		title.Draw()
 	}
 	return *item
 }
@@ -70,12 +80,14 @@ func NewRect(rect *sdl.Rect, color uint32) Rect {
 	item.Rect = rect
 	item.Color = color
 	item.Scale = 1
-	item.LastRect = item.Rect
+	item.LastRects = []*sdl.Rect{item.Rect}
 	item.Changed = true
 	return *item
 }
 
-func (item *Image) Draw(s *sdl.Surface) {
+func (item *Image) Draw() {
+	item.Clear()
+	s := item.ParentSurface
 	r := item.GetRect()
 	// log.Println(r.X/r.W, r.Y/r.H)
 	item.Image.BlitScaled(
@@ -84,7 +96,7 @@ func (item *Image) Draw(s *sdl.Surface) {
 		&sdl.Rect{r.X, r.Y, int32(float64(r.W) * item.Scale), int32(float64(r.H) * item.Scale)},
 	)
 	item.Changed = false
-	item.LastRect = item.GetRect()
+	item.LastRects = append(item.LastRects, item.GetRect())
 }
 
 func (item *Image) Destroy() {
@@ -94,14 +106,15 @@ func (item *Image) Destroy() {
 func (item *Rect) Destroy() {
 }
 
-func (item *Rect) Draw(s *sdl.Surface) {
+func (item *Rect) Draw() {
+	s := item.ParentSurface
 	s.FillRect(item.Rect, item.Color)
 	item.Changed = false
-	item.LastRect = item.Rect
+	item.LastRects = append(item.LastRects, item.GetRect())
 }
 
-func (item *Rect) GetLastRect() *sdl.Rect {
-	return item.LastRect
+func (item *Rect) GetLastRects() []*sdl.Rect {
+	return item.LastRects
 }
 
 func (item *Rect) GetRect() *sdl.Rect {
@@ -109,7 +122,7 @@ func (item *Rect) GetRect() *sdl.Rect {
 }
 
 func (item *Rect) SetRect(rect *sdl.Rect) {
-	item.LastRect = item.Rect
+	item.LastRects = append(item.LastRects, item.GetRect())
 	item.Rect = rect
 	item.Changed = true
 }
@@ -118,10 +131,13 @@ func (item *Rect) IsChanged() bool {
 	return item.Changed
 }
 
-func (item *Rect) Clear(s *sdl.Surface) {
-	r := item.GetLastRect()
+func (item *Rect) Clear() {
+	s := item.ParentSurface
+	for _, r := range item.LastRects {
+		s.FillRect(r, 0x00000000)
+	}
+	item.LastRects = []*sdl.Rect{}
 	// lr := sdl.Rect{r.X, r.Y, int32(float64(r.W) * item.LastScale), int32(float64(r.H) * item.LastScale)}
-	s.FillRect(r, 0x00000000)
 }
 
 func (item *Rect) SetScale(scale float64) {
@@ -134,15 +150,40 @@ func (item *Rect) GetScale() float64 {
 	return item.Scale
 }
 
+func (item *Rect) AnimateMove(x int32, y int32, duration int32) {
+	duration = duration / 2
+	dx := int32(float32(x) / float32(duration))
+	dy := int32(float32(y) / float32(duration))
+	ey := item.Rect.Y + y
+	ex := item.Rect.X + x
+	for dx != 0 || dy != 0 {
+		if math.Abs(float64(item.Rect.Y-ey)) < math.Abs(float64(dy)) {
+			dy = item.Rect.Y - ey
+			if math.Abs(float64(dy)) < 1 {
+				dy = 0
+			}
+		}
+		if math.Abs(float64(item.Rect.X-ex)) < math.Abs(float64(dx)) {
+			dx = item.Rect.X - ex
+			if math.Abs(float64(dx)) < 1 {
+				dx = 0
+			}
+		}
+
+		item.Move(dx, dy)
+		time.Sleep(1 * time.Millisecond)
+	}
+}
+
 func (item *Rect) Move(x int32, y int32) {
-	item.LastRect = &sdl.Rect{item.Rect.X, item.Rect.Y, item.Rect.W, item.Rect.H}
+	item.LastRects = append(item.LastRects, &sdl.Rect{item.Rect.X, item.Rect.Y, item.Rect.W, item.Rect.H})
 	item.Rect.X += x
 	item.Rect.Y += y
 	item.Changed = true
 }
 
 func (item *Rect) MoveTo(x int32, y int32) {
-	item.LastRect = &sdl.Rect{item.Rect.X, item.Rect.Y, item.Rect.W, item.Rect.H}
+	item.LastRects = append(item.LastRects, &sdl.Rect{item.Rect.X, item.Rect.Y, item.Rect.W, item.Rect.H})
 	item.Rect.X = x
 	item.Rect.Y = y
 	item.Changed = true
@@ -160,7 +201,8 @@ func NewText(rect *sdl.Rect, text string, color uint32) Text {
 	return *item
 }
 
-func (item *Text) Draw(s *sdl.Surface) {
+func (item *Text) Draw() {
+	s := item.ParentSurface
 	message, err := font.RenderUTF8_Blended(item.Text, sdl.Color{250, 250, 250, 1})
 	if err != nil {
 		log.Fatal(err)
@@ -170,5 +212,5 @@ func (item *Text) Draw(s *sdl.Surface) {
 	message.GetClipRect(&srcRect)
 	message.Blit(&srcRect, s, item.GetRect())
 	item.Changed = false
-	item.LastRect = item.Rect.Rect
+	item.LastRects = append(item.LastRects, item.Rect.Rect)
 }

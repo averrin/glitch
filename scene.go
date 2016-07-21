@@ -78,18 +78,24 @@ func (S *Scene) UpLayer(layerName string) {
 }
 
 func (S *Scene) Draw() bool {
-	S.Lock()
 	changed := S.GetChanged()
 	if !changed {
-		S.Unlock()
 		return changed
 	}
-	fmt.Println("scene changed")
+	fmt.Println(len(S.LayersStack))
 	S.Clear()
+	w := sync.WaitGroup{}
 	for _, layer := range S.LayersStack {
-		layer.Draw(S.App.Surface)
+		w.Add(1)
+		go func(L *Layer) {
+			s := L.Draw()
+			S.Lock()
+			s.Blit(&L.Rect, S.App.Surface, &L.Rect)
+			S.Unlock()
+			w.Done()
+		}(layer)
 	}
-	S.Unlock()
+	w.Wait()
 	return changed
 }
 
@@ -128,22 +134,25 @@ func (S *Scene) removeLayer(name string) {
 }
 
 func (S *Scene) AddLayer(name string) (*Layer, error) {
+	amask := uint32(0xff000000)
+	rmask := uint32(0x00ff0000)
+	gmask := uint32(0x0000ff00)
+	bmask := uint32(0x000000ff)
 	var layer *Layer
+
+	S.Lock()
 	layer, ok := S.Layers[name]
 	if ok {
 		return layer, errors.New("Use another layer name")
 	}
 	layer = new(Layer)
 	S.Layers[name] = layer
+	S.LayersStack = append(S.LayersStack, layer)
+	S.Unlock()
 	layer.Name = name
 	layer.Rect = S.Rect
-	amask := uint32(0xff000000)
-	rmask := uint32(0x00ff0000)
-	gmask := uint32(0x0000ff00)
-	bmask := uint32(0x000000ff)
 	layer.Surface, _ = sdl.CreateRGBSurface(sdl.SWSURFACE, S.Width, S.Height, 32, rmask, gmask, bmask, amask)
 	layer.Surface.FillRect(&layer.Rect, 0x00000000)
-	S.LayersStack = append(S.LayersStack, layer)
 	S.Changed = true
 	return layer, nil
 }

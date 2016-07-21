@@ -4,7 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
+	"sync"
+	"time"
 
 	"net/http"
 	_ "net/http/pprof"
@@ -20,15 +23,29 @@ type Application struct {
 	Scene    *Scene
 }
 
+type Mover struct {
+	Item Drawable
+	Y    int32
+}
+
 var games []Game
 var offset int
+var LOCK sync.Mutex
 
 const cols = 7
 const rows = 9
 const tw = 230
 const th = 107
 
+func Shuffle(a []Mover) {
+	for i := range a {
+		j := rand.Intn(i + 1)
+		a[i], a[j] = a[j], a[i]
+	}
+}
+
 func (app *Application) run() int {
+	LOCK = sync.Mutex{}
 	games = GetGames()
 	sdl.Init(sdl.INIT_EVERYTHING)
 	ttf.Init()
@@ -65,7 +82,7 @@ func (app *Application) run() int {
 		c = i % cols
 		go func(i int, r int, c int, game Game) {
 			GetImage(game.Appid)
-			if i >= rows*cols {
+			if i >= (rows+1)*cols {
 				return
 			}
 			drawItem(app, game, c, r)
@@ -73,19 +90,26 @@ func (app *Application) run() int {
 	}
 	go app.Scene.Run()
 
-	// go func() {
-	// 	for {
-	// 		offset++
-	// 		redraw(app, rows, cols, 1)
-	// 		sdl.Delay(1000)
-	// 		offset--
-	// 		redraw(app, rows, cols, -1)
-	// 		sdl.Delay(1000)
-	// 	}
-	// }()
+	offset = 0
+	go func() {
+		time.Sleep(2 * time.Second)
+		d := 1
+		for {
+			log.Print(offset, len(games)/cols)
+			if offset == len(games)/cols {
+				d = -1
+			}
+			if offset == 0 {
+				d = 1
+			}
+			redraw(app, rows, cols, d)
+			time.Sleep(500 * time.Millisecond)
+			// redraw(app, rows, cols, -1)
+			// time.Sleep(2 * time.Second)
+		}
+	}()
 
 	running := true
-	offset = 0
 	// m := &sync.Mutex{}
 	for running {
 		var event sdl.Event
@@ -105,29 +129,13 @@ func (app *Application) run() int {
 				}
 				if key == "Up" {
 					if offset != 0 {
-						offset--
 						redraw(app, rows, cols, -1)
 					}
 				}
 				if key == "Down" {
-					if offset < (len(games)/rows - 1) {
-						offset++
+					if offset < (len(games)/rows - 2) {
 						redraw(app, rows, cols, 1)
 					}
-					// go func(m *sync.Mutex) {
-					// 	r := *app.Scene.Layers["game_22320"].Items[0]
-					// 	z := 1.2
-					// 	m.Lock()
-					// 	if r.GetScale() == 1 {
-					// 		app.Scene.UpLayer("game_22320")
-					// 		r.SetScale(z)
-					// 		r.Move(-int32(float64(r.GetRect().W)*(z-1))/2, -int32(float64(r.GetRect().H)*(z-1))/2)
-					// 	} else {
-					// 		r.Move(int32(float64(r.GetRect().W)*(z-1))/2, int32(float64(r.GetRect().H)*(z-1))/2)
-					// 		r.SetScale(1)
-					// 	}
-					// 	m.Unlock()
-					// }(m)
 				}
 			}
 			if ret == 0 {
@@ -141,15 +149,26 @@ func (app *Application) run() int {
 func drawItem(app *Application, game Game, c int, r int) {
 	layerName := fmt.Sprintf("game_%v", game.Appid)
 	image := NewImage(&sdl.Rect{int32(c * tw), int32(r * th), int32(tw), int32(th)}, fmt.Sprintf("cache/%v.bmp", game.Appid), game.Name)
-	app.Scene.Lock()
 	l, _ := app.Scene.AddLayer(layerName)
 	l.Desc = game.Name
 	l.AddItem(&image)
-	app.Scene.Unlock()
 }
 
 func redraw(app *Application, rows int, cols int, d int) {
-	gw := games[offset*cols : (rows+offset+1)*cols]
+	LOCK.Lock()
+	offset += d
+	log.Print(offset)
+
+	WG := sync.WaitGroup{}
+	end := (rows + offset + 2) * cols
+	if end > len(games)-1 {
+		end = len(games) - 1
+	}
+	start := offset * cols
+	if offset > 0 {
+		start = (offset - 1) * cols
+	}
+	gw := games[start:end]
 	gwIDs := func() []string {
 		r := []string{}
 		for _, g := range gw {
@@ -160,6 +179,7 @@ func redraw(app *Application, rows int, cols int, d int) {
 	counter := 0
 	lays := make([]*Layer, len(app.Scene.LayersStack))
 	copy(lays, app.Scene.LayersStack)
+	toMove := []Mover{}
 	for _, l := range lays {
 		if l.Name == "root" {
 			continue
@@ -167,10 +187,9 @@ func redraw(app *Application, rows int, cols int, d int) {
 		b := false
 		for _, n := range gwIDs {
 			if l.Name == n {
-				item := *l.Items[0]
-				item.Move(0, int32(-th*d))
-				// rect := item.GetRect()
-				// fmt.Println("m", l.Desc, rect.X/rect.W, rect.Y/rect.H)
+				for _, item := range l.Items {
+					toMove = append(toMove, Mover{*item, int32(-th * d)})
+				}
 				b = true
 				counter++
 				break
@@ -182,20 +201,32 @@ func redraw(app *Application, rows int, cols int, d int) {
 		// fmt.Println("r", l.Desc)
 		app.Scene.removeLayer(l.Name)
 	}
+	// Shuffle(toMove)
+	for _, m := range toMove {
+		WG.Add(1)
+		go func(mov Mover) {
+			mov.Item.AnimateMove(0, mov.Y, 200)
+			WG.Done()
+		}(m)
+		// m.Item.Move(0, m.Y)
+	}
 	c := 0
-	r := rows - 1
-	gs := games[(offset+rows)*cols : (offset+rows+1)*cols]
+	r := rows
+	gs := games[(offset+rows+1)*cols : (offset+rows+2)*cols]
 	if d == -1 {
-		r = 0
-		gs = games[offset*cols : (offset+1)*cols]
+		r = -1
+		gs = games[start : (offset+2)*cols]
 	}
 	for i, g := range gs {
 		c = i % cols
+		WG.Add(1)
 		go func(row int, col int, game Game) {
-			// fmt.Println("d", game.Name, c, r)
 			drawItem(app, game, col, row)
+			WG.Done()
 		}(r, c, g)
 	}
+	WG.Wait()
+	LOCK.Unlock()
 }
 
 func main() {

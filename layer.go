@@ -13,18 +13,18 @@ type Layer struct {
 
 func (L *Layer) AddItem(item Drawable) {
 	L.Items = append(L.Items, &item)
+	item.SetParentSurface(L.Surface)
 }
 
-func (L *Layer) Draw(s *sdl.Surface) {
+func (L *Layer) Draw() *sdl.Surface {
 	for _, item := range L.Items {
 		i := (*item)
 		if i.IsChanged() {
-			// L.Surface.FillRect(&L.Rect, 0x00000000)
-			i.Clear(L.Surface)
-			i.Draw(L.Surface)
+			i.Draw()
 		}
 	}
-	L.Surface.Blit(&L.Rect, s, &L.Rect)
+	// L.Surface.Blit(&L.Rect, s, &L.Rect)
+	return L.Surface
 }
 
 func (L *Layer) GetChanged() bool {
