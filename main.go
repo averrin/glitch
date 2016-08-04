@@ -14,22 +14,10 @@ import (
 	st "github.com/averrin/shodan/modules/steam"
 	"github.com/spf13/viper"
 	"github.com/veandco/go-sdl2/sdl"
-	"github.com/veandco/go-sdl2/sdl_ttf"
 )
 
 type Application struct {
-	Window   *sdl.Window
-	Renderer *sdl.Renderer
-	Surface  *sdl.Surface
-	Scene    *seker.Scene
-}
-
-func (app *Application) GetSurface() *sdl.Surface {
-	return app.Surface
-}
-
-func (app *Application) GetWindow() *sdl.Window {
-	return app.Window
+	seker.Application
 }
 
 type Mover struct {
@@ -57,31 +45,10 @@ func Shuffle(a []Mover) {
 func (app *Application) run() int {
 	LOCK = sync.Mutex{}
 	games = steam.GetGames()
-	sdl.Init(sdl.INIT_EVERYTHING)
-	ttf.Init()
-
-	// settings := app.Modes[app.Mode].Init()
 	w := tw * cols
 	h := th * rows
-	window, err := sdl.CreateWindow("Glitch", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-		w, h, sdl.WINDOW_SHOWN)
-	if err != nil {
-		panic(err)
-	}
-	app.Window = window
-	defer app.Window.Destroy()
-	renderer, err := sdl.CreateRenderer(app.Window, -1, sdl.RENDERER_ACCELERATED)
-	surface, err := app.Window.GetSurface()
-	if err != nil {
-		panic(err)
-	}
-	app.Renderer = renderer
-	app.Surface = surface
-	renderer.Clear()
-	app.Scene = seker.NewScene(app, seker.Geometry{int32(w), int32(h)})
-	renderer.Present()
-	sdl.Delay(5)
-	app.Window.UpdateSurface()
+	app.Init("Gideon", sdl.WINDOW_SHOWN, seker.Geometry{int32(w), int32(h)})
+	defer app.Close()
 
 	r := 0
 	c := 0
