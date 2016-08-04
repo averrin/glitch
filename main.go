@@ -1,17 +1,18 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"math/rand"
 	"os"
 	"sync"
-	"time"
 
 	"net/http"
 	_ "net/http/pprof"
 
+	"github.com/averrin/seker"
+	st "github.com/averrin/shodan/modules/steam"
+	"github.com/spf13/viper"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/sdl_ttf"
 )
@@ -20,17 +21,26 @@ type Application struct {
 	Window   *sdl.Window
 	Renderer *sdl.Renderer
 	Surface  *sdl.Surface
-	Scene    *Scene
+	Scene    *seker.Scene
+}
+
+func (app *Application) GetSurface() *sdl.Surface {
+	return app.Surface
+}
+
+func (app *Application) GetWindow() *sdl.Window {
+	return app.Window
 }
 
 type Mover struct {
-	Item Drawable
+	Item seker.Drawable
 	Y    int32
 }
 
-var games []Game
+var games []st.Game
 var offset int
 var LOCK sync.Mutex
+var steam st.Steam
 
 const cols = 7
 const rows = 9
@@ -46,7 +56,7 @@ func Shuffle(a []Mover) {
 
 func (app *Application) run() int {
 	LOCK = sync.Mutex{}
-	games = GetGames()
+	games = steam.GetGames()
 	sdl.Init(sdl.INIT_EVERYTHING)
 	ttf.Init()
 
@@ -68,7 +78,7 @@ func (app *Application) run() int {
 	app.Renderer = renderer
 	app.Surface = surface
 	renderer.Clear()
-	app.Scene = NewScene(app, Geometry{int32(w), int32(h)})
+	app.Scene = seker.NewScene(app, seker.Geometry{int32(w), int32(h)})
 	renderer.Present()
 	sdl.Delay(5)
 	app.Window.UpdateSurface()
@@ -80,7 +90,7 @@ func (app *Application) run() int {
 			r++
 		}
 		c = i % cols
-		go func(i int, r int, c int, game Game) {
+		go func(i int, r int, c int, game st.Game) {
 			GetImage(game.Appid)
 			if i >= (rows+1)*cols {
 				return
@@ -91,23 +101,23 @@ func (app *Application) run() int {
 	go app.Scene.Run()
 
 	offset = 0
-	go func() {
-		time.Sleep(2 * time.Second)
-		d := 1
-		for {
-			log.Print(offset, len(games)/cols)
-			if offset == len(games)/cols {
-				d = -1
-			}
-			if offset == 0 {
-				d = 1
-			}
-			redraw(app, rows, cols, d)
-			time.Sleep(500 * time.Millisecond)
-			// redraw(app, rows, cols, -1)
-			// time.Sleep(2 * time.Second)
-		}
-	}()
+	// go func() {
+	// 	time.Sleep(2 * time.Second)
+	// 	d := 1
+	// 	for {
+	// 		log.Print(offset, len(games)/cols)
+	// 		if offset == len(games)/cols {
+	// 			d = -1
+	// 		}
+	// 		if offset == 0 {
+	// 			d = 1
+	// 		}
+	// 		redraw(app, rows, cols, d)
+	// 		time.Sleep(500 * time.Millisecond)
+	// 		// redraw(app, rows, cols, -1)
+	// 		// time.Sleep(2 * time.Second)
+	// 	}
+	// }()
 
 	running := true
 	// m := &sync.Mutex{}
@@ -146,9 +156,9 @@ func (app *Application) run() int {
 	return 0
 }
 
-func drawItem(app *Application, game Game, c int, r int) {
+func drawItem(app *Application, game st.Game, c int, r int) {
 	layerName := fmt.Sprintf("game_%v", game.Appid)
-	image := NewImage(&sdl.Rect{int32(c * tw), int32(r * th), int32(tw), int32(th)}, fmt.Sprintf("cache/%v.bmp", game.Appid), game.Name)
+	image := seker.NewImage(&sdl.Rect{int32(c * tw), int32(r * th), int32(tw), int32(th)}, fmt.Sprintf("cache/%v.bmp", game.Appid), game.Name)
 	l, _ := app.Scene.AddLayer(layerName)
 	l.Desc = game.Name
 	l.AddItem(&image)
@@ -177,7 +187,7 @@ func redraw(app *Application, rows int, cols int, d int) {
 		return r
 	}()
 	counter := 0
-	lays := make([]*Layer, len(app.Scene.LayersStack))
+	lays := make([]*seker.Layer, len(app.Scene.LayersStack))
 	copy(lays, app.Scene.LayersStack)
 	toMove := []Mover{}
 	for _, l := range lays {
@@ -199,7 +209,7 @@ func redraw(app *Application, rows int, cols int, d int) {
 			continue
 		}
 		// fmt.Println("r", l.Desc)
-		app.Scene.removeLayer(l.Name)
+		app.Scene.RemoveLayer(l.Name)
 	}
 	// Shuffle(toMove)
 	for _, m := range toMove {
@@ -220,7 +230,7 @@ func redraw(app *Application, rows int, cols int, d int) {
 	for i, g := range gs {
 		c = i % cols
 		WG.Add(1)
-		go func(row int, col int, game Game) {
+		go func(row int, col int, game st.Game) {
 			drawItem(app, game, col, row)
 			WG.Done()
 		}(r, c, g)
@@ -236,8 +246,14 @@ func main() {
 	if _, err := os.Stat("cache"); err != nil {
 		os.Mkdir("cache", 0777)
 	}
-	STEAMID = flag.String("steamID", "76561198049930669", "Steam user ID")
-	flag.Parse()
+	viper.SetConfigType("yaml")
+	viper.SetConfigName("config")
+	viper.AddConfigPath(".")
+	err := viper.ReadInConfig()
+	if err != nil {
+		panic(fmt.Errorf("Fatal error config file: %s \n", err))
+	}
+	steam = st.Connect(viper.GetStringMapString("steam"))
 	app := new(Application)
 	os.Exit(app.run())
 }
